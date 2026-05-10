@@ -1,6 +1,7 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV MPLBACKEND=Agg
 
 RUN apt update && apt upgrade -y && apt install -y \
     software-properties-common \
@@ -9,6 +10,11 @@ RUN apt update && apt upgrade -y && apt install -y \
     python3-pip \
     curl \
     git \
+    libxrender1 \
+    libxext6 \
+    libsm6 \
+    libfontconfig1 \
+    libfreetype6 \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
