@@ -40,6 +40,15 @@ test_tasks = [t for t in all_tasks if t["split"] == "test"]
 
 
 # ---- Pydantic models ----
+# Reward for a submission made after the task has already been graded. Negative
+# so repeat submissions are actively discouraged, not merely left unscored.
+REPEAT_SUBMISSION_PENALTY = -0.1
+
+# Verifier outcomes that mean "the molecule never got checked against the
+# constraints" -- a malformed answer, not a graded attempt. These stay retryable.
+MALFORMED_REASONS = {"parse_failure", "sanitization_failure"}
+
+
 class TaskSpec(BaseModel):
     id: str
     formula: str
@@ -72,6 +81,12 @@ class Formula2SMILES(Environment):
             else []
         )
 
+        # Graded submissions this session. Only the first is rewarded: the verifier
+        # reports exactly why an answer failed (formula mismatch with the computed
+        # formula, which groups are missing), so an uncapped tool turns the task
+        # into a search against the checker rather than a chemistry problem.
+        self.submitted = 0
+
     @classmethod
     def list_splits(cls) -> list[str]:
         return ["train", "test"]
@@ -94,10 +109,26 @@ class Formula2SMILES(Environment):
         against the required molecular formula and any functional group
         constraints. This finishes the episode.
         """
+        if self.submitted > 0:
+            return ToolOutput(
+                blocks=[TextBlock(type="text", text="An answer has already been submitted for "
+                                  "this task. This episode is over: it is not re-checked, and "
+                                  "repeat submissions are penalised (reward -0.1).")],
+                metadata={"task_id": self.config.id, "already_submitted": True,
+                          "submission_count": self.submitted},
+                reward=REPEAT_SUBMISSION_PENALTY,
+                finished=True,
+            )
+
         smiles = params.smiles.strip()
         result = self._verify_smiles(smiles)
 
         reward = 1.0 if result["correct"] else 0.0
+
+        # A SMILES that would not parse or sanitize never reached the constraint
+        # checks, so it does not consume the attempt.
+        if result.get("reason") not in MALFORMED_REASONS:
+            self.submitted += 1
 
         return ToolOutput(
             blocks=[TextBlock(type="text", text=result["message"])],
