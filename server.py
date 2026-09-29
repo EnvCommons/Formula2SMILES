@@ -45,7 +45,8 @@ test_tasks = [t for t in all_tasks if t["split"] == "test"]
 REPEAT_SUBMISSION_PENALTY = -0.1
 
 # Verifier outcomes that mean "the molecule never got checked against the
-# constraints" -- a malformed answer, not a graded attempt. These stay retryable.
+# constraints" -- a malformed answer, not a graded attempt. These do not end the
+# episode, so the agent can fix the SMILES and submit again.
 MALFORMED_REASONS = {"parse_failure", "sanitization_failure"}
 
 
@@ -107,7 +108,8 @@ class Formula2SMILES(Environment):
         """
         Submit a SMILES string as your answer. The molecule will be validated
         against the required molecular formula and any functional group
-        constraints. This finishes the episode.
+        constraints. This finishes the episode, unless the SMILES cannot be
+        parsed or sanitized, in which case it is not graded and you may resubmit.
         """
         if self.submitted > 0:
             return ToolOutput(
@@ -126,8 +128,9 @@ class Formula2SMILES(Environment):
         reward = 1.0 if result["correct"] else 0.0
 
         # A SMILES that would not parse or sanitize never reached the constraint
-        # checks, so it does not consume the attempt.
-        if result.get("reason") not in MALFORMED_REASONS:
+        # checks, so it does not consume the attempt or end the episode.
+        graded = result.get("reason") not in MALFORMED_REASONS
+        if graded:
             self.submitted += 1
 
         return ToolOutput(
@@ -141,7 +144,7 @@ class Formula2SMILES(Environment):
                 **result,
             },
             reward=reward,
-            finished=True,
+            finished=graded,
         )
 
     def _verify_smiles(self, smiles: str) -> dict[str, Any]:
@@ -153,12 +156,14 @@ class Formula2SMILES(Environment):
         4. Formula match via CalcMolFormula (Hill notation)
         5. Functional group check via exmol (if constraints exist)
         """
-        # Step 1: Parse
+        # Step 1: Parse. An empty string parses to a molecule with no atoms, which
+        # is not an answer either.
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
+        if mol is None or mol.GetNumAtoms() == 0:
             return {
                 "correct": False,
-                "message": "Invalid SMILES: could not parse.",
+                "message": "Invalid SMILES: could not parse. This was not graded; "
+                "submit a corrected SMILES.",
                 "reason": "parse_failure",
             }
 
@@ -168,7 +173,8 @@ class Formula2SMILES(Environment):
         except Exception as e:
             return {
                 "correct": False,
-                "message": f"Invalid molecule: sanitization failed ({e}).",
+                "message": f"Invalid molecule: sanitization failed ({e}). This was not "
+                "graded; submit a corrected SMILES.",
                 "reason": "sanitization_failure",
             }
 

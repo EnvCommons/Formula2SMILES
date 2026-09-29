@@ -36,7 +36,8 @@ This is a sparse, verifiable reward environment with binary scoring. The agent c
 5. Functional group check via `exmol` (if constraints specified)
 
 - **Correct** (all checks pass): Reward **1.0**.
-- **Incorrect** (any check fails): Reward **0.0**.
+- **Incorrect** (any check from step 3 onward fails): Reward **0.0**.
+- **Malformed** (the SMILES is empty or fails to parse or sanitize): Reward **0.0**, not graded. The episode stays open so the agent can submit a corrected SMILES.
 
 We do not use LLM graders for this task.
 
@@ -48,11 +49,11 @@ Tasks are derived from [ZINC20](https://zinc20.docking.org/) (via `sagawa/ZINC-c
 
 Agents are given a single tool:
 
-- `submit_answer`: Submit a SMILES string as the answer. The molecule is validated against the required molecular formula and any functional group constraints. Returns whether the answer is correct with a diagnostic message. This tool can only be called once per task.
+- `submit_answer`: Submit a SMILES string as the answer. The molecule is validated against the required molecular formula and any functional group constraints. Returns whether the answer is correct with a diagnostic message. Only one answer is graded per task; a SMILES that fails to parse or sanitize is not graded and can be resubmitted.
 
 ## Time Horizon
 
-Formula2SMILES is a single-turn environment. The agent receives a molecular formula (with optional constraints) and submits one SMILES string. Each task requires exactly one tool call.
+Formula2SMILES is a single-turn environment. The agent receives a molecular formula (with optional constraints) and submits one SMILES string. Each task requires one tool call, plus a resubmission if the first SMILES fails to parse or sanitize.
 
 ## Environment Difficulty
 
