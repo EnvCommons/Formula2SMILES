@@ -37,7 +37,7 @@ This is a sparse, verifiable reward environment with binary scoring. The agent c
 
 - **Correct** (all checks pass): Reward **1.0**.
 - **Incorrect** (any check from step 3 onward fails): Reward **0.0**.
-- **Malformed** (the SMILES fails to parse or sanitize): Reward **0.0**, not graded. The episode stays open so the agent can submit a corrected SMILES.
+- **Malformed** (the SMILES is empty or fails to parse or sanitize): Reward **0.0**, not graded. The episode stays open so the agent can submit a corrected SMILES.
 
 We do not use LLM graders for this task.
 

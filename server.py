@@ -156,9 +156,10 @@ class Formula2SMILES(Environment):
         4. Formula match via CalcMolFormula (Hill notation)
         5. Functional group check via exmol (if constraints exist)
         """
-        # Step 1: Parse
+        # Step 1: Parse. An empty string parses to a molecule with no atoms, which
+        # is not an answer either.
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
+        if mol is None or mol.GetNumAtoms() == 0:
             return {
                 "correct": False,
                 "message": "Invalid SMILES: could not parse. This was not graded; "
