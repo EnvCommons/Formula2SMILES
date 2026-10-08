@@ -35,6 +35,8 @@ This is a sparse, verifiable reward environment with binary scoring. The agent c
 4. Formula match via `CalcMolFormula` (Hill notation exact match)
 5. Functional group check via `exmol` (if constraints specified)
 
+The required functional groups are exmol labels, whose meaning can differ from the textbook name (for example, `ether` is the SMARTS `COC`, which needs two aliphatic carbons, and `hetero N basic no H` is `[nX3H0+0]`, a three-connected aromatic nitrogen). The prompt of each functional-group task lists the SMARTS pattern of every required group, read from the installed exmol at startup.
+
 - **Correct** (all checks pass): Reward **1.0**.
 - **Incorrect** (any check from step 3 onward fails): Reward **0.0**.
 - **Malformed** (the SMILES is empty or fails to parse or sanitize): Reward **0.0**, not graded. The episode stays open so the agent can submit a corrected SMILES.

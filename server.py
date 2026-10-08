@@ -9,6 +9,7 @@ Binary reward: 1.0 if valid SMILES + correct formula + all FG constraints met, e
 """
 import json
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,33 @@ for t in all_tasks:
 
 train_tasks = [t for t in all_tasks if t["split"] == "train"]
 test_tasks = [t for t in all_tasks if t["split"] == "test"]
+
+
+def _load_group_smarts() -> dict[str, str]:
+    """exmol's functional-group SMARTS, keyed by the lowercased label that
+    get_functional_groups reports. Parsed as exmol parses smarts.txt: comment
+    lines skipped, rank cutoff 500, the last definition of a name wins."""
+    import exmol.lime_data
+
+    table = {}
+    for line in files(exmol.lime_data).joinpath("smarts.txt").read_text().splitlines():
+        if not line or line[0] == "#":
+            continue
+        i1 = line.find(":")
+        i2 = line.find(":", i1 + 1)
+        if int(line[i1 + 1 : i2]) > 500:
+            continue
+        name = line[:i1]
+        label = name[0].lower() + name[1:].replace("_", " ")
+        table[label.lower()] = line[i2 + 1 :].strip()
+    return table
+
+
+# The required groups are exmol labels whose meaning can differ from the
+# textbook one (e.g. "ether" is COC with two aliphatic carbons, and "hetero N
+# basic no H" is a three-connected aromatic nitrogen), so the prompt states the
+# pattern each one is checked with.
+GROUP_SMARTS = _load_group_smarts()
 
 
 # ---- Pydantic models ----
@@ -101,7 +129,19 @@ class Formula2SMILES(Environment):
         raise ValueError(f"Unknown split: {split}")
 
     def get_prompt(self) -> list[TextBlock]:
-        return [TextBlock(type="text", text=self.config.prompt)]
+        text = self.config.prompt
+        if self.functional_groups:
+            definitions = "\n".join(
+                f"- {g}: {GROUP_SMARTS.get(g.lower(), '(no pattern)')}"
+                for g in self.functional_groups
+            )
+            text += (
+                "\n\nThe functional groups are exmol labels. Each is checked by an RDKit "
+                "substructure match of this SMARTS pattern (lowercase atoms are aromatic, "
+                "uppercase atoms aliphatic), and counts only if the pattern matches:\n"
+                + definitions
+            )
+        return [TextBlock(type="text", text=text)]
 
     @tool
     async def submit_answer(self, params: SubmitSmilesInput) -> ToolOutput:
