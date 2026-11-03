@@ -19,11 +19,11 @@ Formula2SMILES does not require a sandbox. It has minimal compute requirements.
 
 ## License
 
-[Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0) (following the ZINC-canonicalized dataset license).
+[MIT](https://opensource.org/licenses/MIT). The underlying ZINC-canonicalized dataset is released under Apache 2.0.
 
 ## Tasks
 
-There are two splits: train (1,000 tasks) and test (100 tasks), totaling 1,100 tasks. Each task provides a molecular formula in Hill notation and optionally a set of required functional groups. Approximately 60% of tasks include functional group constraints and 40% are formula-only. The dataset covers 856 unique molecular formulas.
+There are 1,000 tasks in the `train` split and 100 in `test`. Each task provides a molecular formula in Hill notation and optionally a set of required functional groups. Approximately 60% of tasks include functional group constraints and 40% are formula-only. The dataset covers 856 unique molecular formulas.
 
 ## Reward Structure
 
@@ -40,6 +40,7 @@ The required functional groups are exmol labels, whose meaning can differ from t
 - **Correct** (all checks pass): Reward **1.0**.
 - **Incorrect** (any check from step 3 onward fails): Reward **0.0**.
 - **Malformed** (the SMILES is empty or fails to parse or sanitize): Reward **0.0**, not graded. The episode stays open so the agent can submit a corrected SMILES.
+- **Repeat submission** (after an answer has been graded): Reward **-0.1**.
 
 We do not use LLM graders for this task.
 
@@ -56,10 +57,6 @@ Agents are given a single tool:
 ## Time Horizon
 
 Formula2SMILES is a single-turn environment. The agent receives a molecular formula (with optional constraints) and submits one SMILES string. Each task requires one tool call, plus a resubmission if the first SMILES fails to parse or sanitize.
-
-## Environment Difficulty
-
-[Statistics on environment difficulty here]
 
 ## Other Environment Requirements
 
